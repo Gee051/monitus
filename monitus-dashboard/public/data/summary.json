@@ -1,0 +1,109 @@
+{
+  "setting": {
+    "threshold": 0.98,
+    "persistence": 10
+  },
+  "falseAlarmsPerDay": 0.64,
+  "realWells": 40,
+  "faults": [
+    {
+      "id": 1,
+      "name": "Abrupt increase of water (BSW)",
+      "recordings": 4,
+      "caught": 0.0,
+      "caughtEarly": 0.0,
+      "medianWarningMinutes": null
+    },
+    {
+      "id": 2,
+      "name": "Safety valve closing by itself (DHSV)",
+      "recordings": 22,
+      "caught": 0.955,
+      "caughtEarly": 0.955,
+      "medianWarningMinutes": 80.0
+    },
+    {
+      "id": 3,
+      "name": "Severe slugging",
+      "recordings": 32,
+      "caught": 0.031,
+      "caughtEarly": null,
+      "medianWarningMinutes": null
+    },
+    {
+      "id": 4,
+      "name": "Flow instability",
+      "recordings": 343,
+      "caught": 0.0,
+      "caughtEarly": null,
+      "medianWarningMinutes": null
+    },
+    {
+      "id": 5,
+      "name": "Rapid productivity loss",
+      "recordings": 11,
+      "caught": 0.364,
+      "caughtEarly": 0.364,
+      "medianWarningMinutes": 35.0
+    },
+    {
+      "id": 6,
+      "name": "Quick restriction in the production choke",
+      "recordings": 6,
+      "caught": 0.0,
+      "caughtEarly": 0.0,
+      "medianWarningMinutes": null
+    },
+    {
+      "id": 7,
+      "name": "Scaling in the production choke",
+      "recordings": 36,
+      "caught": 0.472,
+      "caughtEarly": 0.472,
+      "medianWarningMinutes": 225.0
+    },
+    {
+      "id": 8,
+      "name": "Hydrate in the production line",
+      "recordings": 14,
+      "caught": 0.571,
+      "caughtEarly": 0.571,
+      "medianWarningMinutes": 2317.0
+    },
+    {
+      "id": 9,
+      "name": "Hydrate in the service line",
+      "recordings": 57,
+      "caught": 0.018,
+      "caughtEarly": 0.071,
+      "medianWarningMinutes": 104.0
+    }
+  ],
+  "demos": [
+    {
+      "id": "hydrate",
+      "title": "Hydrate caught early",
+      "outcome": "caught"
+    },
+    {
+      "id": "valve",
+      "title": "Safety valve closure caught early",
+      "outcome": "caught"
+    },
+    {
+      "id": "scaling",
+      "title": "Scaling caught early",
+      "outcome": "caught"
+    },
+    {
+      "id": "normal",
+      "title": "Normal well with no false alarms",
+      "outcome": "quiet"
+    },
+    {
+      "id": "missed",
+      "title": "Honest miss: hydrate in the service line",
+      "outcome": "missed"
+    }
+  ]
+}

@@ -2,9 +2,9 @@
 .venv/
 __pycache__/
 
-# Large data, recreated by the scripts
-3W/
-data/
+# Large data, recreated by the scripts (top-level folders only)
+/3W/
+/data/
 
 # Node
 node_modules/

@@ -1,0 +1,367 @@
+:root {
+  --bg: #f7f7f5;
+  --card: #ffffff;
+  --chart-bg: #fbfbfa;
+  --text: #1a1a18;
+  --muted: #5f5e5a;
+  --border: #e3e2dc;
+  --accent: #185fa5;
+  --line: #2c2c2a;
+  --risk: #a32d2d;
+  --danger: #a32d2d;
+  --danger-bg: #fcebeb;
+  --warning: #854f0b;
+  --warning-bg: #faeeda;
+  --success: #3b6d11;
+  --success-bg: #eaf3de;
+  --band-developing: rgba(239, 159, 39, 0.22);
+  --band-full: rgba(226, 75, 74, 0.22);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141413;
+    --card: #1f1f1d;
+    --chart-bg: #191917;
+    --text: #f1efe8;
+    --muted: #b4b2a9;
+    --border: #34342f;
+    --accent: #85b7eb;
+    --line: #d3d1c7;
+    --risk: #f09595;
+    --danger: #f09595;
+    --danger-bg: #3a1717;
+    --warning: #fac775;
+    --warning-bg: #3a2a10;
+    --success: #97c459;
+    --success-bg: #1f2a12;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.55;
+}
+
+a {
+  color: var(--accent);
+}
+
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+}
+
+.hero {
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.hero h1 {
+  margin: 4px 0 8px;
+  font-size: 30px;
+  line-height: 1.2;
+}
+
+.lead,
+.muted {
+  color: var(--muted);
+  margin: 0;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.card h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+
+.controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+select,
+button {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+}
+
+.play {
+  background: var(--text);
+  color: var(--card);
+  border-color: var(--text);
+  cursor: pointer;
+  min-width: 90px;
+}
+
+.meta,
+.note {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 8px 0;
+}
+
+.scrub {
+  width: 100%;
+  margin: 4px 0 12px;
+}
+
+.status {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.status p {
+  margin: 2px 0;
+}
+
+.status-title {
+  font-weight: 600;
+}
+
+.status-alert {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.status-watch {
+  background: var(--warning-bg);
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.status-ok {
+  background: var(--success-bg);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.status-note {
+  font-size: 13px;
+}
+
+.why {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  vertical-align: -2px;
+  margin-right: 4px;
+  border-radius: 2px;
+}
+
+.swatch-developing {
+  background: var(--band-developing);
+}
+
+.swatch-full {
+  background: var(--band-full);
+}
+
+.swatch-alarm {
+  width: 3px;
+  background: var(--danger);
+}
+
+.charts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.chart-label {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+}
+
+.sensor-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.sensor-desc {
+  color: var(--muted);
+}
+
+.sensor-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.chart {
+  width: 100%;
+  display: block;
+  background: var(--chart-bg);
+  border-radius: 6px;
+}
+
+.band-developing {
+  fill: var(--band-developing);
+}
+
+.band-full {
+  fill: var(--band-full);
+}
+
+.sensor-line {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.5;
+}
+
+.risk-line {
+  fill: none;
+  stroke: var(--risk);
+  stroke-width: 2;
+}
+
+.threshold {
+  stroke: var(--muted);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.alarm-line {
+  stroke: var(--danger);
+  stroke-width: 2;
+}
+
+.playhead {
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+
+.missing {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.metric {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.metric p {
+  margin: 0;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.metric-value {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.about p {
+  margin: 8px 0;
+}
+
+.error {
+  color: var(--danger);
+}
+
+@media (max-width: 640px) {
+  .chart-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .hero h1 {
+    font-size: 24px;
+  }
+}

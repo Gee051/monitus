@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import LineChart from "./LineChart";
 import RiskDial from "./RiskDial";
-import type { Demo, Summary } from "../lib/monitus";
+import type { Demo, Sensor, Summary } from "../lib/monitus";
 import {
   DEMO_LABELS,
   errorMessage,
@@ -24,6 +24,24 @@ const SPEEDS: Speed[] = [
   { label: "1 day a second", minutesPerSecond: 1440 },
 ];
 
+const COUNT_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+
+const countWord = (n: number): string => COUNT_WORDS[n] ?? String(n);
+
+const isNotRecorded = (sensor: Sensor): boolean =>
+  sensor.missing && (!sensor.note || sensor.note.startsWith("No signal"));
+
+const statusWord = (sensor: Sensor): string => {
+  if (isNotRecorded(sensor)) return "no data";
+  return sensor.note?.startsWith("Read zero") ? "offline" : "faulty";
+};
+
+const missingText = (sensor: Sensor, sensors: Sensor[]): string => {
+  if (!isNotRecorded(sensor)) return sensor.note ?? "This sensor was faulty in this recording.";
+  const scoredFrom = sensors.filter((s) => !isNotRecorded(s)).length;
+  return `No data recorded for this well. Monitus scored it from the other ${countWord(scoredFrom)}.`;
+};
+
 const readingAt = (values: (number | null)[], index: number): string => {
   const value = values[index];
   return value == null ? "--" : value.toFixed(1);
@@ -42,7 +60,13 @@ const Status = ({ demo, minute, cursorIndex, finished }: StatusProps) => {
         <p className="status-title">
           <span className="lamp" aria-hidden="true" /> Alarm: trouble developing
         </p>
-        {demo.predictedFaultName && <p className="status-line">Looks like: {demo.predictedFaultName}</p>}
+        {demo.predictedFaultName && (
+          <p className="status-line">
+            {demo.predictedFault === demo.fault
+              ? `Looks like: ${demo.predictedFaultName}`
+              : `First guess: ${demo.predictedFaultName}. Right that something was wrong, wrong about which fault.`}
+          </p>
+        )}
         {demo.why.length > 0 && (
           <>
             <p className="status-sub">What moved in the last hour</p>
@@ -78,7 +102,9 @@ const Status = ({ demo, minute, cursorIndex, finished }: StatusProps) => {
     return (
       <div className="status status-quiet" role="status">
         <p className="status-title">No alarms</p>
-        <p className="status-line">Monitus stayed quiet through {formatDuration(demo.durationMinutes)} of normal running.</p>
+        <p className="status-line">
+          Monitus stayed quiet through {formatDuration(demo.t[demo.t.length - 1] - demo.t[0])} of normal running.
+        </p>
       </div>
     );
   }
@@ -142,19 +168,21 @@ const Replay = ({ summary }: { summary: Summary }) => {
     return () => observer.disconnect();
   }, [demo]);
 
+  const start = demo ? demo.t[0] : 0;
   const end = demo ? demo.t[demo.t.length - 1] : 0;
-  const finished = demo != null && minute >= end;
-  const minutesPerSecond = SPEEDS[speedIndex].minutesPerSecond ?? Math.max(1, end / 20);
-  const cursorIndex = demo ? lastIndexAtOrBefore(demo.t, minute) : 0;
+  const shown = Math.min(end, Math.max(minute, start));
+  const finished = demo != null && shown >= end;
+  const minutesPerSecond = SPEEDS[speedIndex].minutesPerSecond ?? Math.max(1, (end - start) / 20);
+  const cursorIndex = demo ? lastIndexAtOrBefore(demo.t, shown) : 0;
 
   useEffect(() => {
     if (!playing || !demo || finished) return;
     const step = (minutesPerSecond * TICK_MS) / 1000;
     const timer = setInterval(() => {
-      setMinute((current) => Math.min(end, current + step));
+      setMinute((current) => Math.min(end, Math.max(current, start) + step));
     }, TICK_MS);
     return () => clearInterval(timer);
-  }, [playing, demo, finished, minutesPerSecond, end]);
+  }, [playing, demo, finished, minutesPerSecond, start, end]);
 
   const selectDemo = (id: string) => {
     if (id === demoId) return;
@@ -175,7 +203,7 @@ const Replay = ({ summary }: { summary: Summary }) => {
     setPlaying((current) => !current);
   };
 
-  const alarmOn = demo != null && demo.alarmMinute != null && minute >= demo.alarmMinute;
+  const alarmOn = demo != null && demo.alarmMinute != null && shown >= demo.alarmMinute;
   const buttonLabel = finished ? "Replay" : playing ? "Pause" : "Play";
 
   return (
@@ -220,10 +248,10 @@ const Replay = ({ summary }: { summary: Summary }) => {
                 <div className="scrubber">
                   <input
                     type="range"
-                    min={0}
+                    min={start}
                     max={end}
                     step={1}
-                    value={Math.round(minute)}
+                    value={Math.round(shown)}
                     onChange={(event) => {
                       setPlaying(false);
                       setMinute(Number(event.target.value));
@@ -231,7 +259,7 @@ const Replay = ({ summary }: { summary: Summary }) => {
                     aria-label="Replay position"
                   />
                   <div className="clock">
-                    <span>{formatDuration(minute)}</span>
+                    <span>{formatDuration(shown)}</span>
                     <span className="clock-total">of {formatDuration(end)}</span>
                   </div>
                 </div>
@@ -256,20 +284,20 @@ const Replay = ({ summary }: { summary: Summary }) => {
                         <span className="strip-desc">{sensor.label}</span>
                       </div>
                       {sensor.missing ? (
-                        <div className="strip-missing">No signal in this recording. Monitus works with the other four.</div>
+                        <div className="strip-missing">{missingText(sensor, demo.sensors)}</div>
                       ) : (
                         <LineChart
                           t={demo.t}
                           values={sensor.values}
                           phase={demo.phase}
-                          revealMinute={minute}
-                          cursorMinute={minute}
+                          revealMinute={shown}
+                          cursorMinute={shown}
                           alarmMinute={demo.alarmMinute}
                         />
                       )}
                       <div className="strip-value">
                         {sensor.missing ? (
-                          <span className="value-off">off</span>
+                          <span className="value-off">{statusWord(sensor)}</span>
                         ) : (
                           <>
                             <span className="value-number">{readingAt(sensor.values, cursorIndex)}</span>
@@ -288,8 +316,8 @@ const Replay = ({ summary }: { summary: Summary }) => {
                       t={demo.t}
                       values={demo.risk}
                       phase={demo.phase}
-                      revealMinute={minute}
-                      cursorMinute={minute}
+                      revealMinute={shown}
+                      cursorMinute={shown}
                       alarmMinute={demo.alarmMinute}
                       domain={RISK_DOMAIN}
                       threshold={demo.threshold}
@@ -302,7 +330,7 @@ const Replay = ({ summary }: { summary: Summary }) => {
 
                 <aside className="console-side">
                   <RiskDial risk={demo.risk[cursorIndex] ?? null} threshold={demo.threshold} alarmOn={alarmOn} />
-                  <Status demo={demo} minute={minute} cursorIndex={cursorIndex} finished={finished} />
+                  <Status demo={demo} minute={shown} cursorIndex={cursorIndex} finished={finished} />
                   <dl className="facts">
                     <div>
                       <dt>Well</dt>

@@ -12,7 +12,7 @@ const archivo = Archivo({
 
 const TITLE = "Monitus | Early warning for offshore oil wells";
 const DESCRIPTION =
-  "Monitus reads five pressure and temperature sensors on offshore wells and raises the alarm while a fault is still developing. Replay real well recordings and see when it would have warned.";
+  "Monitus reads a well's pressure and temperature sensors and raises the alarm while a fault is still developing. Replay real well recordings and see when it would have warned.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://monitus.vercel.app"),

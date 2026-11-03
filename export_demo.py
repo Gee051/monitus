@@ -6,13 +6,14 @@ import pandas as pd
 
 DATASET_DIR = Path("3W/dataset")
 PREDICTIONS_PATH = Path("data/cv_predictions.parquet")
-WINDOWS_PATH = Path("data/windows.parquet")
 DASHBOARD_PUBLIC = Path("monitus-dashboard/public")
 OUTPUT_DIR = DASHBOARD_PUBLIC / "data"
 THRESHOLD = 0.98
 PERSISTENCE = 10
 MAX_POINTS = 4000
-DEGREES = "\u00b0C"
+MAX_CANDIDATES = 30
+STUCK_SHARE = 0.9
+DEGREES = "°C"
 SENSORS = [
     ("P-PDG", "bar", "Pressure at the bottom of the well"),
     ("P-TPT", "bar", "Pressure at the subsea Christmas tree"),
@@ -21,7 +22,8 @@ SENSORS = [
     ("T-JUS-CKP", DEGREES, "Temperature after the platform choke"),
 ]
 SENSOR_NAMES = [name for name, _, _ in SENSORS]
-REL_COLUMNS = [f"{name}__rel60" for name in SENSOR_NAMES]
+UNITS = {name: unit for name, unit, _ in SENSORS}
+PLAUSIBLE = {"bar": (0, 1000), DEGREES: (-50, 250)}
 FAULT_NAMES = {
     0: "Normal operation",
     1: "Abrupt increase of water (BSW)",
@@ -56,6 +58,40 @@ def clean(value, digits):
 
 def to_int(value):
     return None if value is None or pd.isna(value) else int(value)
+
+
+def load_minutes(folder, file):
+    path = DATASET_DIR / str(folder) / file
+    if not path.exists():
+        return None
+    raw = pd.read_parquet(path).sort_index()
+    minute = raw.reindex(columns=SENSOR_NAMES).astype("float64").resample("1min").median()
+    start = minute.index[0]
+    minute.index = ((minute.index - start) / pd.Timedelta(minutes=1)).astype(int)
+    for name in SENSOR_NAMES:
+        if UNITS[name] == "bar":
+            minute[name] = minute[name] / 1e5
+    return start, minute
+
+
+def sensor_note(series):
+    """Return None for a working sensor, or a short note explaining why it can't be trusted."""
+    values = series.dropna()
+    if values.empty:
+        return "No signal in this recording."
+    low, high = PLAUSIBLE[UNITS[series.name]]
+    median = values.median()
+    if not np.isfinite(median) or median < low or median > high or values.abs().max() > 1e6:
+        return "Impossible readings in this recording, so the sensor was faulty."
+    if values.abs().max() < 0.01:
+        return "Read zero for the whole recording, so the sensor was offline."
+    if values.round(6).value_counts().iloc[0] / len(values) >= STUCK_SHARE:
+        return "Stuck on one value for almost the whole recording."
+    return None
+
+
+def sensor_health(minute):
+    return {name: sensor_note(minute[name]) for name in SENSOR_NAMES}
 
 
 p = pd.read_parquet(PREDICTIONS_PATH)
@@ -105,60 +141,85 @@ for fault, group in fault_files.groupby("folder"):
     })
 
 
+def working_sensor_count(key):
+    info = files.loc[key]
+    loaded = load_minutes(int(info["folder"]), info["file"])
+    if loaded is None:
+        return -1
+    return sum(note is None for note in sensor_health(loaded[1]).values())
+
+
 def pick(folder, outcome):
     pool = files[files["folder"] == folder].copy()
     if outcome == "caught":
         pool = pool[pool["first_early_alarm"].notna() & pool["full_start"].notna()]
-        if pool.empty:
-            return None
         pool["type_match"] = pool["predicted_at_alarm"] == folder
         pool["distance"] = (pool["warning"] - pool["warning"].median()).abs()
-        return pool.sort_values(["type_match", "distance"], ascending=[False, True]).index[0]
-    if outcome == "quiet":
-        quiet = pool[pool["normal_alarms"] == 0]
-        pool = quiet if not quiet.empty else pool.sort_values("normal_alarms").head(1)
-        return pool.sort_values("minutes", ascending=False).index[0]
-    pool = pool[~pool["caught"]]
+        order = (["type_match", "distance"], [False, True])
+    elif outcome == "quiet":
+        pool = pool[pool["normal_alarms"] == 0]
+        order = (["minutes"], [False])
+    else:
+        pool = pool[~pool["caught"]]
+        order = (["has_developing", "minutes"], [False, False])
     if pool.empty:
         return None
-    return pool.sort_values(["has_developing", "minutes"], ascending=False).index[0]
+
+    pool = pool.sort_values(by=order[0], ascending=order[1]).head(MAX_CANDIDATES)
+    pool["working"] = [working_sensor_count(key) for key in pool.index]
+    pool = pool[pool["working"] >= 0]
+    if pool.empty:
+        return None
+    best = pool["working"].max()
+    return pool[pool["working"] == best].index[0]
 
 
-windows = pd.read_parquet(WINDOWS_PATH, columns=["file", "folder", "minutes_from_start"] + REL_COLUMNS)
-
-
-def explain(file, folder, minute):
-    row = windows[
-        (windows["file"] == file) & (windows["folder"] == folder) & (windows["minutes_from_start"] == minute)
-    ]
-    if row.empty:
+def explain(minute, health, at):
+    hour_ago = minute.shift(60)
+    change = ((minute - hour_ago) / (hour_ago.abs() + 1e-6)).clip(-10, 10)
+    if at not in change.index:
         return []
-    values = row.iloc[0]
+    row = change.loc[at]
     ranked = sorted(
         (
-            (name, float(values[f"{name}__rel60"]))
+            (name, float(row[name]))
             for name in SENSOR_NAMES
-            if pd.notna(values[f"{name}__rel60"]) and np.isfinite(values[f"{name}__rel60"])
+            if health[name] is None and pd.notna(row[name]) and np.isfinite(row[name])
         ),
         key=lambda item: abs(item[1]),
         reverse=True,
     )
     return [
-        f"{name} {'up' if change > 0 else 'down'} {abs(change) * 100:.0f}% in the last hour"
-        for name, change in ranked[:3]
-        if abs(change) >= 0.01
+        f"{name} {'up' if value > 0 else 'down'} {abs(value) * 100:.0f}% in the last hour"
+        for name, value in ranked[:3]
+        if abs(value) >= 0.01
     ]
+
+
+def pick_hero_sensor(minute, health, fault_start):
+    best_name, best_score = None, -1.0
+    for name in SENSOR_NAMES:
+        if health[name] is not None:
+            continue
+        series = minute[name].dropna()
+        before = series[series.index < fault_start] if fault_start is not None else series.iloc[:0]
+        after = series[series.index >= fault_start] if fault_start is not None else series
+        if len(after) < 10:
+            continue
+        spread_after = np.percentile(after, 95) - np.percentile(after, 5)
+        spread_before = np.percentile(before, 95) - np.percentile(before, 5) if len(before) >= 10 else 0.0
+        score = spread_after / (spread_before + 0.01 * abs(series.median()) + 1e-3)
+        if score > best_score:
+            best_name, best_score = name, score
+    return best_name
 
 
 def build_demo(demo_id, key, outcome):
     info = files.loc[key]
     folder = int(info["folder"])
     rows = p[p["key"] == key]
-
-    raw = pd.read_parquet(DATASET_DIR / str(folder) / info["file"]).sort_index()
-    minute = raw.reindex(columns=SENSOR_NAMES).astype("float64").resample("1min").median()
-    start = minute.index[0]
-    minute.index = ((minute.index - start) / pd.Timedelta(minutes=1)).astype(int)
+    start, minute = load_minutes(folder, info["file"])
+    health = sensor_health(minute)
 
     step = max(1, int(np.ceil(len(rows) / MAX_POINTS)))
     sampled = rows.iloc[::step]
@@ -166,20 +227,22 @@ def build_demo(demo_id, key, outcome):
 
     sensors = []
     for name, unit, label in SENSORS:
-        series = minute[name].reindex(t)
-        if unit == "bar":
-            series = series / 1e5
-        values = [clean(v, 2) for v in series]
+        note = health[name]
+        values = [None] * len(t) if note else [clean(v, 2) for v in minute[name].reindex(t)]
         sensors.append({
             "name": name,
             "unit": unit,
             "label": label,
             "values": values,
-            "missing": all(v is None for v in values),
+            "missing": note is not None,
+            "note": note,
         })
 
     alarm_minute = to_int(info["first_early_alarm"]) if outcome == "caught" else None
     predicted = to_int(info["predicted_at_alarm"]) if alarm_minute is not None else None
+    fault_start = to_int(info["developing_start"])
+    if fault_start is None:
+        fault_start = to_int(info["full_start"])
 
     return {
         "id": demo_id,
@@ -196,13 +259,14 @@ def build_demo(demo_id, key, outcome):
         "phase": [PHASE_CODES[phase] for phase in sampled["phase"]],
         "risk": [clean(v, 3) for v in sampled["prob_trouble"]],
         "sensors": sensors,
+        "heroSensor": pick_hero_sensor(minute, health, fault_start),
         "alarmMinute": alarm_minute,
         "developingStartMinute": to_int(info["developing_start"]),
         "fullStartMinute": to_int(info["full_start"]),
         "warningMinutes": to_int(info["warning"]) if alarm_minute is not None else None,
         "predictedFault": predicted,
         "predictedFaultName": FAULT_NAMES.get(predicted) if predicted is not None else None,
-        "why": explain(info["file"], folder, alarm_minute) if alarm_minute is not None else [],
+        "why": explain(minute, health, alarm_minute) if alarm_minute is not None else [],
     }
 
 
@@ -217,8 +281,11 @@ for demo_id, folder, outcome, title in DEMOS:
     with open(OUTPUT_DIR / f"demo-{demo_id}.json", "w", encoding="utf-8") as handle:
         json.dump(demo, handle, separators=(",", ":"))
     demo_list.append({"id": demo_id, "title": title, "outcome": outcome})
-    warning = demo["warningMinutes"]
-    print(f"{demo_id}: {demo['file']} ({len(demo['t'])} points, warning {warning} min)")
+    faulty = [s["name"] for s in demo["sensors"] if s["missing"]]
+    print(
+        f"{demo_id}: {demo['file']} ({len(demo['t'])} points, warning {demo['warningMinutes']} min, "
+        f"hero {demo['heroSensor']}, not shown: {', '.join(faulty) or 'none'})"
+    )
 
 summary = {
     "setting": {"threshold": THRESHOLD, "persistence": PERSISTENCE},

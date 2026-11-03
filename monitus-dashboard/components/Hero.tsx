@@ -13,10 +13,18 @@ const WIPE_DELAY = 0.3;
 const pickHeroDemo = (summary: Summary): string | null =>
   summary.demos.find((d) => d.id === "hydrate")?.id ?? summary.demos.find((d) => d.outcome === "caught")?.id ?? null;
 
+const pinStyle = (at: number): CSSProperties => {
+  if (at > 85) return { left: `${at}%`, transform: "translateX(-100%)" };
+  if (at < 15) return { left: `${at}%`, transform: "translateX(0)" };
+  return { left: `${at}%` };
+};
+
 const HeroScreen = ({ demo }: { demo: Demo }) => {
+  const working = demo.sensors.filter((s) => !s.missing);
   const sensor =
-    HERO_SENSORS.map((name) => demo.sensors.find((s) => s.name === name && !s.missing)).find(Boolean) ??
-    demo.sensors.find((s) => !s.missing);
+    working.find((s) => s.name === demo.heroSensor) ??
+    HERO_SENSORS.map((name) => working.find((s) => s.name === name)).find(Boolean) ??
+    working[0];
   if (!sensor) return null;
 
   const start = demo.t[0] ?? 0;
@@ -56,12 +64,12 @@ const HeroScreen = ({ demo }: { demo: Demo }) => {
           </div>
         )}
         {alarmAt != null && (
-          <span className="pin pin-alarm" style={{ left: `${alarmAt}%` }}>
+          <span className="pin pin-alarm" style={pinStyle(alarmAt)}>
             Monitus alarm
           </span>
         )}
         {fullAt != null && (
-          <span className="pin pin-full" style={{ left: `${fullAt}%` }}>
+          <span className="pin pin-full" style={pinStyle(fullAt)}>
             {demo.fault === 8 || demo.fault === 9 ? "Line blocked" : "Full swing"}
           </span>
         )}
@@ -108,7 +116,7 @@ const Hero = ({ summary }: { summary: Summary }) => {
         <div className="hero-copy">
           <h1 id="hero-title">Warning before the well stops flowing</h1>
           <p className="lead">
-            Monitus reads five pressure and temperature sensors on an offshore well and raises the alarm while a fault
+            Monitus reads pressure and temperature sensors on an offshore well and raises the alarm while a fault
             is still developing, often hours before it peaks.
           </p>
           <div className="actions">

@@ -6,6 +6,7 @@ export type Sensor = {
   label: string;
   values: (number | null)[];
   missing: boolean;
+  note?: string | null;
 };
 
 export type Demo = {
@@ -23,6 +24,7 @@ export type Demo = {
   phase: number[];
   risk: (number | null)[];
   sensors: Sensor[];
+  heroSensor?: string | null;
   alarmMinute: number | null;
   developingStartMinute: number | null;
   fullStartMinute: number | null;

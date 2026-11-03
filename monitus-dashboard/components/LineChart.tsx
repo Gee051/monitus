@@ -111,11 +111,12 @@ const LineChart = ({
 }: LineChartProps) => {
   const clipId = `clip${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const geometry = useMemo(() => buildGeometry(t, values, phase, height, domain), [t, values, phase, height, domain]);
-  const { xOf, yOf, segments, all, area, bands, maxT } = geometry;
+  const { xOf, yOf, segments, all, area, bands } = geometry;
 
   const stripHeight = height > 100 ? 6 : 4;
-  const revealX = revealMinute == null ? WIDTH : xOf(Math.min(revealMinute, maxT));
-  const cursorX = cursorMinute == null ? null : xOf(Math.min(cursorMinute, maxT));
+  const clampX = (x: number) => Math.min(WIDTH, Math.max(0, x));
+  const revealX = revealMinute == null ? WIDTH : clampX(xOf(revealMinute));
+  const cursorX = cursorMinute == null ? null : clampX(xOf(cursorMinute));
   const alarmVisible = alarmMinute != null && (revealMinute == null || revealMinute >= alarmMinute);
 
   return (

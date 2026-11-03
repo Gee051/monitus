@@ -1,11 +1,11 @@
 const STEPS = [
   {
     title: "Read the sensors",
-    body: "Five sensors report once a second. Each minute is boiled down to its median, so a single spike can't fool the system.",
+    body: "Each sensor reports once a second. Each minute is boiled down to its median, so a single spike can't fool the system.",
   },
   {
     title: "Describe each minute",
-    body: "For every sensor: its level, how much it's wobbling, and how far it has moved over the last 10 and 60 minutes. That's 25 numbers a minute.",
+    body: "For every sensor: its level, how much it's wobbling, and how far it has moved over the last 10 and 60 minutes. That's five numbers per sensor, so 25 a minute in this version.",
   },
   {
     title: "Score the risk",
@@ -89,8 +89,8 @@ const HowItWorks = () => (
       <div className="section-head">
         <h2 id="how-title">How it works</h2>
         <p>
-          The sensor names are Portuguese abbreviations from Petrobras. Monitus uses the five that are present in most
-          recordings.
+          This version uses the five sensors recorded in most of Petrobras&apos; data. The pipeline isn&apos;t tied to
+          five: add a sensor to the list and retrain. The names are Portuguese abbreviations from Petrobras.
         </p>
       </div>
 
